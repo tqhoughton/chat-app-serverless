@@ -1,0 +1,99 @@
+// requires
+
+const aws = require('aws-sdk'),
+      Promise = require('bluebird'),
+      docClient = Promise.promisifyAll(new aws.DynamoDB.DocumentClient()),
+      iotData = Promise.promisifyAll(new aws.IotData({endpoint: 'a1m8cwer9lqmrm.iot.us-west-2.amazonaws.com'}))
+
+exports.handler = (event, context, callback) => {
+  const senderId = event.senderId
+  const username = event.username
+  const userId = event.userId
+  
+  //console.log(senderId, userId)
+  
+  function sendIotPush(userId, senderId) {
+    return new Promise((resolve, reject) => {
+      const params = {
+        TableName: process.env.USERS_TABLE,
+        Key: {
+          userId: senderId
+        },
+        ProjectionExpression: 'userId,username'
+      }
+      docClient.getAsync(params).then((result) => {
+        let item = { type: 'invite', payload: result.Item }
+        let endpoint = `${process.env.IOT_CHANNEL}/user/${userId}`
+        let iotParams = {
+          payload: JSON.stringify(item),
+          topic: endpoint
+        }
+        
+        console.log('iot params are: ', iotParams)
+        
+        iotData.publishAsync(iotParams).then((results) => {
+          resolve()
+        })
+      })
+    })
+  }
+  function addInviteToUser(userId, senderId) {
+    console.log('userid: ', userId, 'senderId: ', senderId)
+    return new Promise((resolve, reject) => {
+      console.log(docClient.createSet([senderId]))
+      const params = {
+        TableName: process.env.USERS_TABLE,
+        Key: {
+          userId
+        },
+        UpdateExpression: 'ADD invitesRecieved :i',
+        ExpressionAttributeValues: {
+          ':i': docClient.createSet([senderId])
+        }
+      }
+      docClient.updateAsync(params).then((results) => {
+        console.log('success')
+        resolve(results)
+      }, (err) => {
+        console.log('err')
+        reject(err)
+      })
+    })
+  }
+  
+  if (userId) {
+    console.log('provided user id')
+    let addInvite = addInviteToUser(userId, senderId)
+    let iotSend = sendIotPush(userId, senderId)
+    
+    Promise.all([addInvite, iotSend]).then(([results, iot]) => {
+      callback(null, {results, iot})
+    })
+  } else {
+    console.log('didn\'t have user id')
+    const params = {
+      TableName: process.env.USERS_TABLE,
+      IndexName: 'username-index',
+      KeyConditionExpression: 'username = :u',
+      ExpressionAttributeValues: {
+        ':u': username
+      }
+    };
+
+    docClient.queryAsync(params).then((data) => {
+      console.log(data)
+      if (!data.Items.length) {
+          callback(new Error('[404] Username not found.'))
+      }
+      const receiverId = data.Items[0].userId
+      
+
+      let addInvite = addInviteToUser(receiverId, senderId)
+      let iotSend = sendIotPush(receiverId, senderId)
+      
+      Promise.all([addInvite, iotSend]).then(([results, iot]) => {
+        callback(null, results)
+      })
+    })
+  }
+};

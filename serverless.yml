@@ -1,0 +1,527 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: chat-app-serverless # NOTE: update this with your service name
+
+# You can pin your service to only deploy with a specific Serverless version
+# Check out our docs for more details
+# frameworkVersion: "=X.X.X"
+
+provider:
+  name: aws
+  runtime: nodejs6.10
+  region: us-west-2
+  profile: personal
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - "dynamodb:*"
+        - "iot:*"
+      Resource: "*"
+  environment:
+    IOT_CHANNEL: /${self:custom.functionPrefix}
+    USERS_TABLE: ${self:custom.usersTable}
+    CHATS_TABLE: ${self:custom.chatsTable}
+    MESSAGES_TABLE: ${self:custom.messagesTable}
+custom:
+  functionPrefix: chat-app-${self:provider.stage}
+  usersTable: ${self:custom.functionPrefix}.users
+  chatsTable: ${self:custom.functionPrefix}.chats
+  messagesTable: ${self:custom.functionPrefix}.messages
+  identityPool: chatApp${self:provider.stage}
+package:
+  include:
+    - src/node_modules/**
+# you can overwrite defaults here
+#  stage: dev
+#  region: us-east-1
+
+# you can add statements to the Lambda function's IAM Role here
+#  iamRoleStatements:
+#    - Effect: "Allow"
+#      Action:
+#        - "s3:ListBucket"
+#      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
+#    - Effect: "Allow"
+#      Action:
+#        - "s3:PutObject"
+#      Resource:
+#        Fn::Join:
+#          - ""
+#          - - "arn:aws:s3:::"
+#            - "Ref" : "ServerlessDeploymentBucket"
+#            - "/*"
+
+# you can define service wide environment variables here
+#  environment:
+#    variable1: value1
+
+# you can add packaging information here
+#package:
+#  include:
+#    - include-me.js
+#    - include-me-dir/**
+#  exclude:
+#    - exclude-me.js
+#    - exclude-me-dir/**
+
+functions:
+  acceptInvite:
+    name: ${self:custom.functionPrefix}-acceptInvite
+    handler: src/functions/acceptInvite.handler
+    events:
+      - http:
+          path: invites/accept
+          method: post
+          cors: true
+          integration: lambda
+          request:
+            passThrough: NEVER
+            template:
+              application/json: |
+                #set($inputRoot = $input.path('$'))
+                {
+                  "senderId": "$context.authorizer.claims.sub",
+                  "receiverId": "$inputRoot.userId"
+                }
+  createUser:
+    name: ${self:custom.functionPrefix}-createUser
+    handler: src/functions/createUser.handler
+    events:
+      - cognitoUserPool:
+          pool: MyUserPool
+          trigger: PostConfirmation
+  getChats:
+    name: ${self:custom.functionPrefix}-getChats
+    handler: src/functions/getChats.handler
+    events:
+      - http:
+          path: user/chats
+          method: get
+          cors: true
+          integration: lambda
+          request:
+            passThrough: NEVER
+            template:
+              application/json: |
+                {
+                  "userId": "$context.authorizer.claims.sub"
+                }
+  getInvites:
+    name: ${self:custom.functionPrefix}-getInvites
+    handler: src/functions/getInvites.handler
+    events:
+      - http:
+          path: user/invites
+          method: get
+          cors: true
+          integration: lambda
+          request:
+            passThrough: NEVER
+            template:
+              application/json: |
+                {
+                  "userId": "$context.authorizer.claims.sub"
+                }
+  getMessages:
+    name: ${self:custom.functionPrefix}-getMessages
+    handler: src/functions/getMessages.handler
+    events:
+      - http:
+          path: user/chats/{userId}/messages
+          method: get
+          cors: true
+          integration: lambda
+          request:
+            passThrough: NEVER
+            template:
+              application/json: |
+                #set($inputRoot = $input.path('$'))
+                {
+                  "userId": "$context.authorizer.claims.sub",
+                  "otherUserId": "$input.params('userId')"
+                }
+  getOnlineUsers:
+    name: ${self:custom.functionPrefix}-getOnlineUsers
+    handler: src/functions/getOnlineUsers.handler
+    events:
+      - http:
+          path: users/online
+          method: get
+          cors: true
+          integration: lambda
+          request:
+            passThrough: NEVER
+            template:
+              application/json: |
+                {
+                  "timeLimit": 300000,
+                  "userId": "$context.authorizer.claims.sub"
+                }
+  getUser:
+    name: ${self:custom.functionPrefix}-getUser
+    handler: src/functions/getUser.handler
+    events:
+      - http:
+          path: user
+          method: get
+          cors: true
+          integration: lambda
+          request:
+            passThrough: NEVER
+            template:
+              application/json: |
+                {
+                  "userId": "$context.authorizer.claims.sub"
+                }
+  sendInvite:
+    name: ${self:custom.functionPrefix}-sendInvite
+    handler: src/functions/sendInvite.handler
+    events:
+      - http:
+          path: invites/send
+          method: post
+          cors: true
+          integration: lambda
+          request:
+            passThrough: NEVER
+            template:
+              application/json: |
+                #set($inputRoot = $input.path('$'))
+                {
+                  "senderId": "$context.authorizer.claims.sub",
+                  "username": "$inputRoot.username",
+                  "userId": "$inputRoot.userId"
+                }
+  sendMessage:
+    name: ${self:custom.functionPrefix}-sendMessage
+    handler: src/functions/sendMessage.handler
+    events:
+      - http:
+          path: user/chats/{userId}/messages
+          method: post
+          cors: true
+          integration: lambda
+          request:
+            passThrough: NEVER
+            template:
+              application/json: |
+                #set($inputRoot = $input.path('$'))
+                {
+                  "messageBody": "$inputRoot.messageBody",
+                  "senderId": "$context.authorizer.claims.sub",
+                  "receiverId": "$input.params('userId')"
+                }
+
+
+#    The following are a few example events you can configure
+#    NOTE: Please make sure to change your handler code to work with those events
+#    Check the event documentation for details
+#    events:
+#      - http:
+#          path: users/create
+#          method: get
+#      - s3: ${env:BUCKET}
+#      - schedule: rate(10 minutes)
+#      - sns: greeter-topic
+#      - stream: arn:aws:dynamodb:region:XXXXXX:table/foo/stream/1970-01-01T00:00:00.000
+#      - alexaSkill
+#      - iot:
+#          sql: "SELECT * FROM 'some_topic'"
+#      - cloudwatchEvent:
+#          event:
+#            source:
+#              - "aws.ec2"
+#            detail-type:
+#              - "EC2 Instance State-change Notification"
+#            detail:
+#              state:
+#                - pending
+#      - cloudwatchLog: '/aws/lambda/hello'
+#      - cognitoUserPool:
+#          pool: MyUserPool
+#          trigger: PreSignUp
+
+#    Define function environment variables here
+#    environment:
+#      variable2: value2
+
+# you can add CloudFormation resource templates here
+#resources:
+#  Resources:
+#    NewResource:
+#      Type: AWS::S3::Bucket
+#      Properties:
+#        BucketName: my-new-bucket
+#  Outputs:
+#     NewOutput:
+#       Description: "Description for the output"
+#       Value: "Some output value"
+resources:
+  Resources:
+    ApiGatewayMethodUserGet:
+      Type: "AWS::ApiGateway::Method"
+      Properties:
+        AuthorizationType: COGNITO_USER_POOLS
+        AuthorizerId:
+          Ref: ApiGatewayAuthorizer
+    ApiGatewayMethodUserInvitesGet:
+      Type: "AWS::ApiGateway::Method"
+      Properties:
+        AuthorizationType: COGNITO_USER_POOLS
+        AuthorizerId:
+          Ref: ApiGatewayAuthorizer
+    ApiGatewayMethodUsersOnlineGet:
+      Type: "AWS::ApiGateway::Method"
+      Properties:
+        AuthorizationType: COGNITO_USER_POOLS
+        AuthorizerId:
+          Ref: ApiGatewayAuthorizer
+    ApiGatewayMethodInvitesSendPost:
+      Type: "AWS::ApiGateway::Method"
+      Properties:
+        AuthorizationType: COGNITO_USER_POOLS
+        AuthorizerId:
+          Ref: ApiGatewayAuthorizer
+    ApiGatewayMethodInvitesAcceptPost:
+      Type: "AWS::ApiGateway::Method"
+      Properties:
+        AuthorizationType: COGNITO_USER_POOLS
+        AuthorizerId:
+          Ref: ApiGatewayAuthorizer
+    ApiGatewayMethodUserChatsGet:
+      Type: "AWS::ApiGateway::Method"
+      Properties:
+        AuthorizationType: COGNITO_USER_POOLS
+        AuthorizerId:
+          Ref: ApiGatewayAuthorizer
+    ApiGatewayMethodUserChatsUseridVarMessagesPost:
+      Type: "AWS::ApiGateway::Method"
+      Properties:
+        AuthorizationType: COGNITO_USER_POOLS
+        AuthorizerId:
+          Ref: ApiGatewayAuthorizer
+    ApiGatewayMethodUserChatsUseridVarMessagesGet:
+      Type: "AWS::ApiGateway::Method"
+      Properties:
+        AuthorizationType: COGNITO_USER_POOLS
+        AuthorizerId:
+          Ref: ApiGatewayAuthorizer
+    ApiGatewayAuthorizer:
+      Type: "AWS::ApiGateway::Authorizer"
+      Properties:
+        Name: UserPool
+        ProviderARNs:
+          - 'Fn::GetAtt': [ CognitoUserPoolMyUserPool, Arn ]
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        IdentitySource: "method.request.header.Authorization"
+        Type: COGNITO_USER_POOLS   
+    MessagesTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: chatId
+            AttributeType: S
+          - AttributeName: messageId
+            AttributeType: S
+          - AttributeName: sent
+            AttributeType: N
+        GlobalSecondaryIndexes:
+          - IndexName: chatId-sent-index
+            KeySchema:
+              - AttributeName: chatId
+                KeyType: HASH
+              - AttributeName: sent
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 5
+              WriteCapacityUnits: 5
+        KeySchema:
+          - AttributeName: messageId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        TableName: ${self:custom.messagesTable}
+    ChatsTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: chatId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: chatId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        TableName: ${self:custom.chatsTable}
+    UsersTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: username
+            AttributeType: S
+        GlobalSecondaryIndexes:
+          - IndexName: username-index
+            KeySchema:
+              - AttributeName: username
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 5
+              WriteCapacityUnits: 5
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        TableName: ${self:custom.usersTable}
+    CognitoUserPoolMyUserPool:
+      Type: "AWS::Cognito::UserPool"
+      Properties:
+        AdminCreateUserConfig:
+          AllowAdminCreateUserOnly: False
+        AliasAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireLowercase: false
+            RequireNumbers: false
+            RequireSymbols: false
+            RequireUppercase: false
+        UserPoolName: ${self:custom.functionPrefix}
+        Schema:
+          - Name: email
+            AttributeDataType: String
+            DeveloperOnlyAttribute: false
+            Mutable: true
+            Required: true
+    WebAppUserPoolWebClient:
+      Type: "AWS::Cognito::UserPoolClient"
+      Properties:
+        ClientName: Web
+        GenerateSecret: false
+        ReadAttributes:
+          - "email"
+        UserPoolId:
+          Ref: CognitoUserPoolMyUserPool
+        WriteAttributes:
+          - "email"
+    WebAppCognitoIdentityPool:
+      Type: "AWS::Cognito::IdentityPool"
+      Properties:
+        IdentityPoolName: ${self:custom.identityPool}
+        AllowUnauthenticatedIdentities: true
+        CognitoIdentityProviders:
+          - ProviderName:
+              'Fn::GetAtt': [ CognitoUserPoolMyUserPool, ProviderName ]
+            ClientId:
+              Ref: WebAppUserPoolWebClient
+    cognitoAuthRole:
+      Type: 'AWS::IAM::Role'
+      Properties:
+        RoleName: ${self:custom.identityPool}_Auth_Role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: cognito-identity.amazonaws.com
+              Action: [ 'sts:AssumeRoleWithWebIdentity' ]
+              Condition:
+                StringEquals:
+                  'cognito-identity.amazonaws.com:aud':
+                    Ref: WebAppCognitoIdentityPool
+                'ForAnyValue:StringLike':
+                    'cognito-identity.amazonaws.com:amr': authenticated
+        Policies:
+          - PolicyName: cognitoauth
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                  - 'iot:Connect'
+                  - 'iot:Subscribe'
+                  Resource:
+                  - "*"
+    cognitoUnauthRole:
+      Type: 'AWS::IAM::Role'
+      Properties:
+        RoleName: ${self:custom.identityPool}_Unauth_Role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Federated: cognito-identity.amazonaws.com
+              Action: [ 'sts:AssumeRoleWithWebIdentity' ]
+              Condition:
+                StringEquals:
+                  'cognito-identity.amazonaws.com:aud':
+                    Ref: WebAppCognitoIdentityPool
+                'ForAnyValue:StringLike':
+                    'cognito-identity.amazonaws.com:amr': unauthenticated
+        Policies:
+          - PolicyName: cognitounauth
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                  - 'iot:Connect'
+                  - 'iot:Subscribe'
+                  - 'iot:*'
+                  - 'mobileanalytics:PutEvents'
+                  - 'cognito-sync:*'
+                  Resource:
+                  - "*"
+    myApiIdentityPoolRoleAttachment:
+      DependsOn: [ WebAppCognitoIdentityPool, cognitoUnauthRole, cognitoAuthRole ]
+      Type: "AWS::Cognito::IdentityPoolRoleAttachment"
+      Properties:
+        IdentityPoolId:
+          Ref: WebAppCognitoIdentityPool
+        Roles:
+          unauthenticated:
+            'Fn::GetAtt': [ cognitoUnauthRole, Arn ]
+          authenticated:
+            'Fn::GetAtt': [ cognitoAuthRole, Arn]
+          
+  Outputs:
+    UserPoolId:
+      Description: User Pool ID for app to use
+      Value:
+        Ref: CognitoUserPoolMyUserPool
+    UserPoolAppClient:
+      Description: App Client ID for app to use
+      Value:
+        Ref: WebAppUserPoolWebClient
+    IotChannel:
+      Description: Root channel that all app communication goes under
+      Value: ${self:provider.environment.IOT_CHANNEL}
+    IdentityPoolId:
+      Description: Identity Pool ID for app to use
+      Value:
+        Ref: WebAppCognitoIdentityPool
