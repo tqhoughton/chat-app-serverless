@@ -37,7 +37,7 @@ exports.handler = (event, context, callback) => {
       })
     })
   }
-  function addInviteToUser(userId, senderId) {
+  function addInviteToUser(userId, senderId, prop) {
     console.log('userid: ', userId, 'senderId: ', senderId)
     return new Promise((resolve, reject) => {
       console.log(docClient.createSet([senderId]))
@@ -46,7 +46,7 @@ exports.handler = (event, context, callback) => {
         Key: {
           userId
         },
-        UpdateExpression: 'ADD invitesRecieved :i',
+        UpdateExpression: `ADD ${prop} :i`,
         ExpressionAttributeValues: {
           ':i': docClient.createSet([senderId])
         }
@@ -63,10 +63,11 @@ exports.handler = (event, context, callback) => {
   
   if (userId) {
     console.log('provided user id')
-    let addInvite = addInviteToUser(userId, senderId)
+    let addInviteReceived = addInviteToUser(userId, senderId, 'invitesReceived')
+    let addInviteSent = addInviteToUser(senderId, userId, 'invitesSent')
     let iotSend = sendIotPush(userId, senderId)
     
-    Promise.all([addInvite, iotSend]).then(([results, iot]) => {
+    Promise.all([addInviteReceived, addInviteSent, iotSend]).then(([results, iot]) => {
       callback(null, {results, iot})
     })
   } else {
@@ -88,10 +89,11 @@ exports.handler = (event, context, callback) => {
       const receiverId = data.Items[0].userId
       
 
-      let addInvite = addInviteToUser(receiverId, senderId)
+      let addInviteRecieved = addInviteToUser(receiverId, senderId, 'invitesReceived')
+      let addInviteSent = addInviteToUser(senderId, receiverId, 'invitesSent')
       let iotSend = sendIotPush(receiverId, senderId)
       
-      Promise.all([addInvite, iotSend]).then(([results, iot]) => {
+      Promise.all([addInviteRecieved, addInviteSent, iotSend]).then(([results, iot]) => {
         callback(null, results)
       })
     })

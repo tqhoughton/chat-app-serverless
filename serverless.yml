@@ -76,6 +76,22 @@ package:
 #    - exclude-me-dir/**
 
 functions:
+  updateUserActivity:
+    name: ${self:custom.functionPrefix}-updateUserActivity
+    handler: src/functions/updateUserActivity.handler
+    events:
+      - http:
+          path: user/last-activity
+          method: put
+          cors: true
+          integration: lambda
+          request:
+            passThrough: NEVER
+            template:
+              application/json: |
+                {
+                  "userId": "$context.authorizer.claims.sub"
+                }
   acceptInvite:
     name: ${self:custom.functionPrefix}-acceptInvite
     handler: src/functions/acceptInvite.handler
@@ -165,7 +181,7 @@ functions:
             template:
               application/json: |
                 {
-                  "timeLimit": 300000,
+                  "timeLimit": 60,
                   "userId": "$context.authorizer.claims.sub"
                 }
   getUser:
@@ -269,6 +285,12 @@ functions:
 #       Value: "Some output value"
 resources:
   Resources:
+    ApiGatewayMethodUserLastDashactivityPut:
+      Type: "AWS::ApiGateway::Method"
+      Properties:
+        AuthorizationType: COGNITO_USER_POOLS
+        AuthorizerId:
+          Ref: ApiGatewayAuthorizer
     ApiGatewayMethodUserGet:
       Type: "AWS::ApiGateway::Method"
       Properties:

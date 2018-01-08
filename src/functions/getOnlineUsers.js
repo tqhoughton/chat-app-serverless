@@ -21,6 +21,10 @@ exports.handler = (event, context, callback) => {
   };
 
   docClient.scanAsync(params).then((data) => {
-    callback(null, data.Items)
+    let returnObj = {}
+    for (let i of data.Items) {
+      returnObj[i.userId] = i
+    }
+    callback(null, returnObj)
   })
 };

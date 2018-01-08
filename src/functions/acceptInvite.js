@@ -14,10 +14,9 @@ exports.handler = (event, context, callback) => {
     Key: {
       userId: senderId
     },
-    UpdateExpression: 'ADD chats :c DELETE invitesRecieved :i',
+    UpdateExpression: 'ADD chats :c DELETE invitesSent :c',
     ExpressionAttributeValues: {
-      ':c': docClient.createSet(receiverId),
-      ':i': docClient.createSet(event.receiverId)
+      ':c': docClient.createSet(receiverId)
     },
     ReturnValues: 'ALL_NEW'
   }
@@ -27,7 +26,7 @@ exports.handler = (event, context, callback) => {
     Key: {
       userId: receiverId
     },
-    UpdateExpression: 'ADD chats :c',
+    UpdateExpression: 'ADD chats :c DELETE invitesRecieved :c',
     ExpressionAttributeValues: {
       ':c': docClient.createSet(senderId)
     },
