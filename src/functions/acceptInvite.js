@@ -9,12 +9,14 @@ exports.handler = (event, context, callback) => {
   const receiverId = event.receiverId
   const chatId = [receiverId, senderId].sort().join('_')
   
+  console.log(senderId, receiverId)
+  
   const senderParams = {
     TableName: process.env.USERS_TABLE,
     Key: {
       userId: senderId
     },
-    UpdateExpression: 'ADD chats :c DELETE invitesSent :c',
+    UpdateExpression: 'ADD chats :c DELETE invitesReceived :c',
     ExpressionAttributeValues: {
       ':c': docClient.createSet(receiverId)
     },
@@ -26,7 +28,7 @@ exports.handler = (event, context, callback) => {
     Key: {
       userId: receiverId
     },
-    UpdateExpression: 'ADD chats :c DELETE invitesRecieved :c',
+    UpdateExpression: 'ADD chats :c DELETE invitesSent :c',
     ExpressionAttributeValues: {
       ':c': docClient.createSet(senderId)
     },
@@ -65,8 +67,12 @@ exports.handler = (event, context, callback) => {
   
   Promise.all([senderUpdate, receiverUpdate, chatInsert, usersGet]).then(([senderResponse, receiverResponse, chatResponse, usersResponse]) => {
     console.log(usersResponse)
-    let sender = usersResponse.Responses[process.env.USERS_TABLE][0]
-    let receiver = usersResponse.Responses[process.env.USERS_TABLE][1]
+    let sender = usersResponse.Responses[process.env.USERS_TABLE].find((x) => {
+      return x.userId === senderId
+    })
+    let receiver = usersResponse.Responses[process.env.USERS_TABLE].find((x) => {
+      return x.userId === receiverId
+    })
     let senderChat = {
       chatId: receiverId,
       otherUser: receiver

@@ -12,7 +12,7 @@ exports.handler = (event, context, callback) => {
   
   //console.log(senderId, userId)
   
-  function sendIotPush(userId, senderId) {
+  function sendIotPush(receiverId, senderId) {
     return new Promise((resolve, reject) => {
       const params = {
         TableName: process.env.USERS_TABLE,
@@ -23,7 +23,8 @@ exports.handler = (event, context, callback) => {
       }
       docClient.getAsync(params).then((result) => {
         let item = { type: 'invite', payload: result.Item }
-        let endpoint = `${process.env.IOT_CHANNEL}/user/${userId}`
+        console.log(item)
+        let endpoint = `${process.env.IOT_CHANNEL}/user/${receiverId}`
         let iotParams = {
           payload: JSON.stringify(item),
           topic: endpoint
@@ -53,7 +54,7 @@ exports.handler = (event, context, callback) => {
       }
       docClient.updateAsync(params).then((results) => {
         console.log('success')
-        resolve(results)
+        resolve(userId)
       }, (err) => {
         console.log('err')
         reject(err)
@@ -67,8 +68,8 @@ exports.handler = (event, context, callback) => {
     let addInviteSent = addInviteToUser(senderId, userId, 'invitesSent')
     let iotSend = sendIotPush(userId, senderId)
     
-    Promise.all([addInviteReceived, addInviteSent, iotSend]).then(([results, iot]) => {
-      callback(null, {results, iot})
+    Promise.all([addInviteReceived, addInviteSent, iotSend]).then(() => {
+      callback(null, userId)
     })
   } else {
     console.log('didn\'t have user id')
@@ -93,8 +94,8 @@ exports.handler = (event, context, callback) => {
       let addInviteSent = addInviteToUser(senderId, receiverId, 'invitesSent')
       let iotSend = sendIotPush(receiverId, senderId)
       
-      Promise.all([addInviteRecieved, addInviteSent, iotSend]).then(([results, iot]) => {
-        callback(null, results)
+      Promise.all([addInviteRecieved, addInviteSent, iotSend]).then(() => {
+        callback(null, receiverId)
       })
     })
   }

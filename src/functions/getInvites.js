@@ -15,7 +15,7 @@ exports.handler = (event, context, callback) => {
     }
   }
   docClient.getAsync(userParams).then((userResults) => {
-    let userIds = userResults.Item.invitesRecieved.values
+    let userIds = userResults.Item.invitesReceived.values
     let ids = userIds.map((i) => {
       return { userId: i }
     })
