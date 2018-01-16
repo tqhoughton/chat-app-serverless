@@ -149,6 +149,23 @@ functions:
                 {
                   "userId": "$context.authorizer.claims.sub"
                 }
+  deleteChat:
+    name: ${self:custom.functionPrefix}-deleteChat
+    handler: src/functions/deleteChat.handler
+    events:
+      - http:
+          path: user/chats/{userId}
+          method: delete
+          cors: true
+          integration: lambda
+          request:
+            passThrough: NEVER
+            template:
+              application/json: |
+                {
+                  "userId": "$context.authorizer.claims.sub",
+                  "otherUserId": "$input.params('userId')"
+                }
   getMessages:
     name: ${self:custom.functionPrefix}-getMessages
     handler: src/functions/getMessages.handler
@@ -162,7 +179,6 @@ functions:
             passThrough: NEVER
             template:
               application/json: |
-                #set($inputRoot = $input.path('$'))
                 {
                   "userId": "$context.authorizer.claims.sub",
                   "otherUserId": "$input.params('userId')"
@@ -285,6 +301,12 @@ functions:
 #       Value: "Some output value"
 resources:
   Resources:
+    ApiGatewayMethodUserChatsUseridVarDelete:
+      Type: "AWS::ApiGateway::Method"
+      Properties:
+        AuthorizationType: COGNITO_USER_POOLS
+        AuthorizerId:
+          Ref: ApiGatewayAuthorizer
     ApiGatewayMethodUserLastDashactivityPut:
       Type: "AWS::ApiGateway::Method"
       Properties:
