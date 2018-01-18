@@ -216,6 +216,9 @@ functions:
                 {
                   "userId": "$context.authorizer.claims.sub"
                 }
+  deleteUser:
+    name: ${self:custom.functionPrefix}-deleteUser
+    handler: src/functions/deleteUser.handler
   sendInvite:
     name: ${self:custom.functionPrefix}-sendInvite
     handler: src/functions/sendInvite.handler
