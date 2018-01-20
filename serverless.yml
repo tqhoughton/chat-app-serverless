@@ -78,6 +78,24 @@ package:
 #    - exclude-me-dir/**
 
 functions:
+  sendGroupMessage:
+    name: ${self:custom.functionPrefix}-sendGroupMessage
+    handler: src/functions/sendGroupMessage.handler
+    events:
+      - http:
+          path: group-chat
+          method: post
+          cors: true
+          integration: lambda
+          request:
+            passThrough: NEVER
+            template:
+              application/json: |
+                #set($inputRoot = $input.path('$'))
+                {
+                  "userId": "$context.authorizer.claims.sub",
+                  "message": "$inputRoot.message"
+                }
   updateUserActivity:
     name: ${self:custom.functionPrefix}-updateUserActivity
     handler: src/functions/updateUserActivity.handler
@@ -327,6 +345,12 @@ resources:
           Variables:
             USER_POOL_ID:
               Ref: CognitoUserPoolMyUserPool
+    ApiGatewayMethodGroupDashchatPost:
+      Type: "AWS::ApiGateway::Method"
+      Properties:
+        AuthorizationType: COGNITO_USER_POOLS
+        AuthorizerId:
+          Ref: ApiGatewayAuthorizer
     ApiGatewayMethodUserDelete:
       Type: "AWS::ApiGateway::Method"
       Properties:
