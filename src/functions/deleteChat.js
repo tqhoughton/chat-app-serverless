@@ -7,13 +7,6 @@ exports.handler = (event, context, callback) => {
   let otherUserId = event.otherUserId
   let chatId = [userId, otherUserId].sort().join('_')
   
-  // delete all messages with that chatId in the messages table, then remove the chatId from each user
-  function deleteChatsAndMessages(messageIds, chatIds) {
-    return new Promise((resolve, reject) => {
-      // TODO
-    })
-  }
-  
   function deleteFromChatsTable(chatId) {
     return new Promise((resolve, reject) => {
       const params = {

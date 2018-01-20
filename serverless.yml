@@ -22,11 +22,13 @@ provider:
   runtime: nodejs6.10
   region: us-west-2
   profile: personal
+  stage: production
   iamRoleStatements:
     - Effect: Allow
       Action:
         - "dynamodb:*"
         - "iot:*"
+        - "cognito-idp:*"
       Resource: "*"
   environment:
     IOT_CHANNEL: /${self:custom.functionPrefix}
@@ -219,6 +221,20 @@ functions:
   deleteUser:
     name: ${self:custom.functionPrefix}-deleteUser
     handler: src/functions/deleteUser.handler
+    events:
+      - http:
+          path: user
+          method: delete
+          cors: true
+          integration: lambda
+          request:
+            passThrough: NEVER
+            template:
+              application/json: |
+                #set($inputRoot = $input.path('$'))
+                {
+                  "userId": "$context.authorizer.claims.sub"
+                }
   sendInvite:
     name: ${self:custom.functionPrefix}-sendInvite
     handler: src/functions/sendInvite.handler
@@ -304,6 +320,19 @@ functions:
 #       Value: "Some output value"
 resources:
   Resources:
+    DeleteUserLambdaFunction:
+      Type: "AWS::Lambda::Function"
+      Properties:
+        Environment:
+          Variables:
+            USER_POOL_ID:
+              Ref: CognitoUserPoolMyUserPool
+    ApiGatewayMethodUserDelete:
+      Type: "AWS::ApiGateway::Method"
+      Properties:
+        AuthorizationType: COGNITO_USER_POOLS
+        AuthorizerId:
+          Ref: ApiGatewayAuthorizer
     ApiGatewayMethodUserChatsUseridVarDelete:
       Type: "AWS::ApiGateway::Method"
       Properties:
