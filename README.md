@@ -5,7 +5,11 @@ Pretty straightforward Serverless Framework project. Run `npm install` on the di
 These are the resources created by this project:
 
 3 DynamoDB tables
+
 1 Cognito User Pool
+
 1 Identity Pool
+
 12 API Gateway Endpoints
+
 12 Lambda Functions
